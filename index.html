@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meus Filmes</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+    margin:0;
+    font-family:Arial,sans-serif;
+    background:#f5f5f5;
+    color:#222;
+}
+
+header{
+    background:#222;
+    color:white;
+    padding:35px 20px;
+    text-align:center;
+}
+
+header h1{
+    margin:0 0 8px;
+}
+
+header p{
+    margin:0;
+    color:#ccc;
+}
+
+.container{
+    max-width:900px;
+    margin:30px auto;
+    padding:0 20px;
+}
+
+.pesquisa{
+    background:white;
+    padding:20px;
+    border-radius:6px;
+    margin-bottom:30px;
+}
+
+.pesquisa form{
+    display:flex;
+    gap:10px;
+}
+
+input{
+    flex:1;
+    padding:12px;
+    border:1px solid #ccc;
+    border-radius:4px;
+    font-size:16px;
+}
+
+button{
+    padding:12px 18px;
+    border:0;
+    border-radius:4px;
+    background:#222;
+    color:white;
+    cursor:pointer;
+}
+
+button:hover{
+    opacity:.8;
+}
+
+.resultados{
+    margin-top:20px;
+}
+
+.resultado{
+    display:flex;
+    gap:15px;
+    padding:15px 0;
+    border-top:1px solid #ddd;
+}
+
+.resultado img{
+    width:70px;
+    height:100px;
+    object-fit:cover;
+}
+
+.resultado-info{
+    flex:1;
+}
+
+.resultado h3{
+    margin:0 0 5px;
+}
+
+.resultado p{
+    color:#777;
+    margin:5px 0 12px;
+}
+
+.ranking h2{
+    border-bottom:1px solid #ddd;
+    padding-bottom:10px;
+}
+
+.filme{
+    display:flex;
+    gap:20px;
+    background:white;
+    padding:20px;
+    margin-bottom:15px;
+    border-radius:6px;
+}
+
+.posicao{
+    font-size:28px;
+    font-weight:bold;
+    width:45px;
+    padding-top:5px;
+}
+
+.filme img{
+    width:130px;
+    height:190px;
+    object-fit:cover;
+}
+
+.info{
+    flex:1;
+}
+
+.info h3{
+    font-size:22px;
+    margin:0 0 5px;
+}
+
+.ano{
+    color:#777;
+    margin-bottom:12px;
+}
+
+.descricao{
+    line-height:1.5;
+}
+
+.acoes{
+    margin-top:15px;
+}
+
+.acoes button{
+    margin-right:5px;
+    padding:8px 12px;
+}
+
+.remover{
+    background:#777;
+}
+
+.mensagem{
+    color:#777;
+    padding:15px 0;
+}
+
+footer{
+    text-align:center;
+    color:#888;
+    font-size:12px;
+    padding:30px;
+}
+
+@media(max-width:600px){
+
+    .pesquisa form{
+        flex-direction:column;
+    }
+
+    .filme{
+        flex-wrap:wrap;
+    }
+
+    .filme img{
+        width:110px;
+        height:160px;
+    }
+
+    .posicao{
+        width:30px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>Meus Melhores Filmes</h1>
+    <p>Meu ranking pessoal de filmes</p>
+</header>
+
+<div class="container">
+
+    <div class="pesquisa">
+
+        <form id="formPesquisa">
+            <input
+                type="text"
+                id="busca"
+                placeholder="Digite o nome de um filme..."
+                autocomplete="off"
+            >
+
+            <button type="submit">Pesquisar</button>
+        </form>
+
+        <div id="resultados" class="resultados"></div>
+
+    </div>
+
+    <div class="ranking">
+
+        <h2>Ranking</h2>
+
+        <div id="listaRanking"></div>
+
+    </div>
+
+</div>
+
+<footer>
+    Dados e imagens fornecidos pelo TMDB. Este site não é endossado ou certificado pelo TMDB.
+</footer>
+
+
+<script>
+
+/* =====================================================
+   COLOQUE SUA API KEY AQUI
+   ===================================================== */
+
+const API_KEY = "COLOQUE_SUA_API_KEY_AQUI";
+
+
+/* =====================================================
+   RANKING
+   Os filmes adicionados ficam salvos no navegador.
+   ===================================================== */
+
+let ranking = JSON.parse(localStorage.getItem("meusFilmes")) || [];
+
+
+/* =====================================================
+   PESQUISAR FILMES
+   ===================================================== */
+
+document.getElementById("formPesquisa").addEventListener("submit", async function(e){
+
+    e.preventDefault();
+
+    const busca = document.getElementById("busca").value.trim();
+    const resultados = document.getElementById("resultados");
+
+    if(!busca){
+        resultados.innerHTML = "<p class='mensagem'>Digite o nome de um filme.</p>";
+        return;
+    }
+
+    resultados.innerHTML = "<p class='mensagem'>Pesquisando...</p>";
+
+    try{
+
+        const resposta = await fetch(
+            `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&language=pt-BR&query=${encodeURIComponent(busca)}`
+        );
+
+        const dados = await resposta.json();
+
+        if(!dados.results || dados.results.length === 0){
+            resultados.innerHTML =
+                "<p class='mensagem'>Nenhum filme encontrado.</p>";
+            return;
+        }
+
+        resultados.innerHTML = "";
+
+        dados.results.slice(0,10).forEach(filme => {
+
+            const ano = filme.release_date
+                ? filme.release_date.substring(0,4)
+                : "Ano desconhecido";
+
+            const imagem = filme.poster_path
+                ? `https://image.tmdb.org/t/p/w200${filme.poster_path}`
+                : "";
+
+            const jaExiste = ranking.some(item => item.id === filme.id);
+
+            resultados.innerHTML += `
+
+                <div class="resultado">
+
+                    ${
+                        imagem
+                        ? `<img src="${imagem}" alt="${filme.title}">`
+                        : `<div style="width:70px;height:100px;background:#ddd"></div>`
+                    }
+
+                    <div class="resultado-info">
+
+                        <h3>${filme.title}</h3>
+
+                        <p>${ano}</p>
+
+                        ${
+                            jaExiste
+                            ? `<button disabled>Já está no ranking</button>`
+                            : `<button onclick="adicionarFilme(${filme.id})">
+                                Adicionar ao ranking
+                              </button>`
+                        }
+
+                    </div>
+
+                </div>
+            `;
+        });
+
+    }catch(erro){
+
+        resultados.innerHTML =
+            "<p class='mensagem'>Erro ao buscar o filme.</p>";
+
+        console.error(erro);
+    }
+
+});
+
+
+/* =====================================================
+   ADICIONAR FILME
+   ===================================================== */
+
+async function adicionarFilme(id){
+
+    try{
+
+        const resposta = await fetch(
+            `https://api.themoviedb.org/3/movie/${id}?api_key=${API_KEY}&language=pt-BR`
+        );
+
+        const filme = await resposta.json();
+
+        if(ranking.some(item => item.id === filme.id)){
+            alert("Esse filme já está no ranking.");
+            return;
+        }
+
+        ranking.push(filme);
+
+        salvarRanking();
+
+        mostrarRanking();
+
+        pesquisarNovamente();
+
+    }catch(erro){
+
+        alert("Não foi possível adicionar o filme.");
+
+        console.error(erro);
+    }
+}
+
+
+/* =====================================================
+   MOSTRAR RANKING
+   ===================================================== */
+
+function mostrarRanking(){
+
+    const lista = document.getElementById("listaRanking");
+
+    lista.innerHTML = "";
+
+    if(ranking.length === 0){
+
+        lista.innerHTML =
+            "<p class='mensagem'>Você ainda não adicionou nenhum filme.</p>";
+
+        return;
+    }
+
+    ranking.forEach((filme,index) => {
+
+        const ano = filme.release_date
+            ? filme.release_date.substring(0,4)
+            : "Ano desconhecido";
+
+        const imagem = filme.poster_path
+            ? `https://image.tmdb.org/t/p/w500${filme.poster_path}`
+            : "";
+
+        lista.innerHTML += `
+
+            <div class="filme">
+
+                <div class="posicao">
+                    ${index + 1}º
+                </div>
+
+                ${
+                    imagem
+                    ? `<img src="${imagem}" alt="${filme.title}">`
+                    : ""
+                }
+
+                <div class="info">
+
+                    <h3>${filme.title}</h3>
+
+                    <div class="ano">${ano}</div>
+
+                    <div class="descricao">
+                        ${
+                            filme.overview
+                            ? filme.overview
+                            : "Descrição não disponível."
+                        }
+                    </div>
+
+                    <div class="acoes">
+
+                        <button onclick="subir(${index})">
+                            Subir
+                        </button>
+
+                        <button onclick="descer(${index})">
+                            Descer
+                        </button>
+
+                        <button class="remover"
+                            onclick="remover(${index})">
+                            Remover
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        `;
+    });
+}
+
+
+/* =====================================================
+   SUBIR FILME
+   ===================================================== */
+
+function subir(index){
+
+    if(index === 0) return;
+
+    const temp = ranking[index];
+
+    ranking[index] = ranking[index - 1];
+
+    ranking[index - 1] = temp;
+
+    salvarRanking();
+
+    mostrarRanking();
+}
+
+
+/* =====================================================
+   DESCER FILME
+   ===================================================== */
+
+function descer(index){
+
+    if(index === ranking.length - 1) return;
+
+    const temp = ranking[index];
+
+    ranking[index] = ranking[index + 1];
+
+    ranking[index + 1] = temp;
+
+    salvarRanking();
+
+    mostrarRanking();
+}
+
+
+/* =====================================================
+   REMOVER
+   ===================================================== */
+
+function remover(index){
+
+    if(confirm("Remover este filme do ranking?")){
+
+        ranking.splice(index,1);
+
+        salvarRanking();
+
+        mostrarRanking();
+    }
+}
+
+
+/* =====================================================
+   SALVAR NO NAVEGADOR
+   ===================================================== */
+
+function salvarRanking(){
+
+    localStorage.setItem(
+        "meusFilmes",
+        JSON.stringify(ranking)
+    );
+}
+
+
+/* =====================================================
+   ATUALIZAR RESULTADOS DA PESQUISA
+   ===================================================== */
+
+function pesquisarNovamente(){
+
+    const busca = document.getElementById("busca").value.trim();
+
+    if(busca){
+        document.getElementById("formPesquisa")
+            .dispatchEvent(new Event("submit"));
+    }
+}
+
+
+/* =====================================================
+   INICIAR
+   ===================================================== */
+
+mostrarRanking();
+
+</script>
+
+</body>
+</html>
